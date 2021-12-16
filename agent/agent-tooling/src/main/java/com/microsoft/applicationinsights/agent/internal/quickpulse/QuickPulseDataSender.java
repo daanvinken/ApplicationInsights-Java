@@ -48,6 +48,7 @@ class QuickPulseDataSender implements Runnable {
       HttpRequest post;
       try {
         post = sendQueue.take();
+        System.out.println(post);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         return;

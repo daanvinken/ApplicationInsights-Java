@@ -22,6 +22,8 @@
 package com.microsoft.applicationinsights.agent.internal.quickpulse;
 
 import com.microsoft.applicationinsights.agent.internal.init.TelemetryClientInitializer;
+import com.microsoft.azure.storage.*;
+import java.io.StringBufferInputStream;
 import java.util.Arrays;
 import java.util.concurrent.ArrayBlockingQueue;
 import org.slf4j.Logger;
@@ -50,5 +52,35 @@ class QuickPulseDataSaver implements Runnable {
         }
       }
     }
+
+    public void saveMetric() {
+      try {
+        CloudStorageAccount storageAccount = CloudStorageAccount.parse(storageConnectionString);
+
+        // Create the Azure Files client.
+        CloudFileClient fileClient = storageAccount.createCloudFileClient();
+
+        StorageCredentials sc = fileClient.getCredentials();
+
+        // Get a reference to the file share
+        CloudFileShare share = fileClient.getShareReference("test");
+
+        //Get a reference to the root directory for the share.
+        CloudFileDirectory rootDir = share.getRootDirectoryReference();
+
+        //Get a reference to the file you want to download
+        CloudFile file = rootDir.getFileReference("test.csv");
+
+        file.upload( new StringBufferInputStream("aaa"),"aaa".length());
+
+        System.out.println("upload success");
+
+      } catch (Exception e) {
+        // Output the stack trace.
+        e.printStackTrace();
+      }
+    }
+
+
 
 }

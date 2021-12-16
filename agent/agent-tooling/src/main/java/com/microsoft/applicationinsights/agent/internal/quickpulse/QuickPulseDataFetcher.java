@@ -53,6 +53,7 @@ class QuickPulseDataFetcher {
   }
 
   private final ArrayBlockingQueue<HttpRequest> sendQueue;
+  private final ArrayBlockingQueue<QuickPulseDataCollector.FinalCounters> saveQueue;
   private final TelemetryClient telemetryClient;
   private final QuickPulseNetworkHelper networkHelper = new QuickPulseNetworkHelper();
   private final String sdkVersion;
@@ -62,11 +63,13 @@ class QuickPulseDataFetcher {
 
   public QuickPulseDataFetcher(
       ArrayBlockingQueue<HttpRequest> sendQueue,
+      ArrayBlockingQueue<QuickPulseDataCollector.FinalCounters> saveQueue,
       TelemetryClient telemetryClient,
       String machineName,
       String instanceName,
       String quickPulseId) {
     this.sendQueue = sendQueue;
+    this.saveQueue = saveQueue;
     this.telemetryClient = telemetryClient;
     this.instanceName = instanceName;
     this.machineName = machineName;
@@ -100,6 +103,9 @@ class QuickPulseDataFetcher {
 
       if (!sendQueue.offer(request)) {
         logger.trace("Quick Pulse send queue is full");
+      }
+      if (!saveQueue.offer(counters)) {
+        logger.trace("Quick Pulse save queue is full");
       }
     } catch (ThreadDeath td) {
       throw td;

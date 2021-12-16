@@ -21,12 +21,34 @@
 
 package com.microsoft.applicationinsights.agent.internal.quickpulse;
 
+import com.microsoft.applicationinsights.agent.internal.init.TelemetryClientInitializer;
+import java.util.Arrays;
+import java.util.concurrent.ArrayBlockingQueue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 class QuickPulseDataSaver implements Runnable {
-  public QuickPulseDataSaver() {}
+  private static final Logger logger = LoggerFactory.getLogger(TelemetryClientInitializer.class);
+  private final ArrayBlockingQueue<QuickPulseDataCollector.FinalCounters> saveQueue;
+  private QuickPulseDataCollector.FinalCounters counter;
+  public QuickPulseDataSaver(ArrayBlockingQueue<QuickPulseDataCollector.FinalCounters> saveQueue) {
+    this.saveQueue = saveQueue;
+  }
     @Override
     public void run () {
-      System.out.println("Quickpulsedatasaver running daanvinken")
-
+      int count = 0;
+      while (true) {
+        try {
+          counter = saveQueue.take();
+          logger.info(String.format("Cpu usage = %f\n", counter.cpuUsage));
+          logger.info(String.format("Memory usage = %02d\n", counter.memoryCommitted));
+        } catch (InterruptedException e) {
+          logger.error(Arrays.toString(e.getStackTrace()));
+        }
+        if (count++ > 20) {
+          break;
+        }
+      }
     }
 
 }

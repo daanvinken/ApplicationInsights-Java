@@ -75,6 +75,10 @@ public enum QuickPulse {
           QuickPulseDataSender quickPulseDataSender =
               new QuickPulseDataSender(httpPipeline, sendQueue);
 
+          ArrayBlockingQueue<QuickPulseDataCollector.FinalCounters> saveQueue = new ArrayBlockingQueue<>(256, true);
+          QuickPulseDataSaver quickPulseDataSaver =
+              new QuickPulseDataSaver(saveQueue);
+
           String instanceName = telemetryClient.getRoleInstance();
           String machineName = HostName.get();
 
@@ -90,13 +94,14 @@ public enum QuickPulse {
                   httpPipeline, telemetryClient, machineName, instanceName, quickPulseId);
           QuickPulseDataFetcher quickPulseDataFetcher =
               new QuickPulseDataFetcher(
-                  sendQueue, telemetryClient, machineName, instanceName, quickPulseId);
+                  sendQueue, saveQueue, telemetryClient, machineName, instanceName, quickPulseId);
 
           QuickPulseCoordinatorInitData coordinatorInitData =
               new QuickPulseCoordinatorInitDataBuilder()
                   .withPingSender(quickPulsePingSender)
                   .withDataFetcher(quickPulseDataFetcher)
                   .withDataSender(quickPulseDataSender)
+                  .withDataSaver(quickPulseDataSaver)
                   .build();
 
           QuickPulseCoordinator coordinator = new QuickPulseCoordinator(coordinatorInitData);
@@ -105,6 +110,11 @@ public enum QuickPulse {
               new Thread(quickPulseDataSender, QuickPulseDataSender.class.getSimpleName());
           senderThread.setDaemon(true);
           senderThread.start();
+
+          Thread saverThread =
+              new Thread(quickPulseDataSaver, QuickPulseDataSender.class.getSimpleName());
+          saverThread.setDaemon(true);
+          saverThread.start();
 
           Thread thread = new Thread(coordinator, QuickPulseCoordinator.class.getSimpleName());
           thread.setDaemon(true);

@@ -29,6 +29,7 @@ final class QuickPulseCoordinatorInitDataBuilder {
   private QuickPulsePingSender pingSender;
   private QuickPulseDataSender dataSender;
   private QuickPulseDataFetcher dataFetcher;
+  private QuickPulseDataSaver dataSaver;
   private long waitBetweenPingsInMillis = DEFAULT_WAIT_BETWEEN_PING_IN_MILLIS;
   private long waitBetweenPostsInMillis = DEFAULT_WAIT_BETWEEN_POSTS_IN_MILLIS;
   private long waitOnErrorInMillis = DEFAULT_WAIT_BETWEEN_PINGS_AFTER_ERROR_IN_MILLIS;
@@ -60,6 +61,11 @@ final class QuickPulseCoordinatorInitDataBuilder {
     return this;
   }
 
+  public QuickPulseCoordinatorInitDataBuilder withDataSaver(QuickPulseDataSaver dataSaver) {
+    this.dataSaver = dataSaver;
+    return this;
+  }
+
   public QuickPulseCoordinatorInitDataBuilder withDataFetcher(QuickPulseDataFetcher dataFetcher) {
     this.dataFetcher = dataFetcher;
     return this;
@@ -74,6 +80,9 @@ final class QuickPulseCoordinatorInitDataBuilder {
     }
     if (dataSender == null) {
       throw new NullPointerException("data sender should not be null");
+    }
+    if (dataSaver == null) {
+      throw new NullPointerException("data saver should not be null");
     }
 
     return new QuickPulseCoordinatorInitData(

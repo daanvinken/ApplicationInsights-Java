@@ -22,9 +22,20 @@
 package com.microsoft.applicationinsights.agent.internal.quickpulse;
 
 import com.microsoft.applicationinsights.agent.internal.init.TelemetryClientInitializer;
-import com.microsoft.azure.storage.*;
-import java.io.StringBufferInputStream;
-import java.util.Arrays;
+import com.microsoft.azure.storage.CloudStorageAccount;
+import com.microsoft.azure.storage.StorageCredentials;
+import com.microsoft.azure.storage.StorageException;
+import com.microsoft.azure.storage.file.CloudFile;
+import com.microsoft.azure.storage.file.CloudFileClient;
+import com.microsoft.azure.storage.file.CloudFileDirectory;
+import com.microsoft.azure.storage.file.CloudFileShare;
+import com.microsoft.azure.storage.file.FileOutputStream;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.time.LocalDateTime;
+import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,55 +43,120 @@ import org.slf4j.LoggerFactory;
 class QuickPulseDataSaver implements Runnable {
   private static final Logger logger = LoggerFactory.getLogger(TelemetryClientInitializer.class);
   private final ArrayBlockingQueue<QuickPulseDataCollector.FinalCounters> saveQueue;
-  private QuickPulseDataCollector.FinalCounters counter;
+  private CloudFileClient fileClient;
+  private String metricLine;
+  private CloudFile cloudFile;
+  private UUID metricUUID;
+  private FileOutputStream outputStream;
+  private static final String csvHeader =
+      "exceptions, requests, requestsDuration, unsuccessfulRequests, "
+          + "rdds, rddsDuration, unsucccessfulRdds, memoryCommitted, cpuUsage\n";
+
+  // TODO better security
+  public static final String storageConnectionString =
+      "DefaultEndpointsProtocol=https;" +
+          "AccountName=<storage_account_name>;" +
+          "AccountKey=<storage_account_key>";
+
   public QuickPulseDataSaver(ArrayBlockingQueue<QuickPulseDataCollector.FinalCounters> saveQueue) {
     this.saveQueue = saveQueue;
+    try {
+      Thread.sleep(5000);
+      String storageConnectionString2 = String.format(
+          "DefaultEndpointsProtocol=https;AccountName=%s;AccountKey=%s",
+          System.getenv("STORAGE_ACCOUNT_NAME"),
+          System.getenv("STORAGE_ACCOUNT_KEY")
+      );
+      logger.info(storageConnectionString2);
+      CloudStorageAccount storageAccount = CloudStorageAccount.parse(storageConnectionString);
+      this.fileClient = storageAccount.createCloudFileClient();
+      StorageCredentials sc = fileClient.getCredentials();
+
+      logger.info("Signed in with default credentials:\n\t" + sc.toString());
+
+      this.metricUUID = UUID.randomUUID();
+      this.initRemoteMetricFile();
+
+    } catch (URISyntaxException e) {
+      String msg = "Error in URI syntax for storing metrics.";
+      logger.error(msg, e);
+    } catch (InvalidKeyException e) {
+      String msg = "Invalid Account Key for storing metrics.";
+      logger.error(msg, e);
+    } catch (StorageException e) {
+      String msg = "Error during storage of metrics (initialization)";
+      logger.error(msg, e);
+    } catch (IOException e) {
+      String msg = "Could not init metric file.";
+      logger.error(msg, e);
+    } catch (InterruptedException e) {
+      String msg = "Thread interrupted (QuickPulseDataSaver).";
+      logger.error(msg, e);
+    }
   }
-    @Override
-    public void run () {
-      int count = 0;
-      while (true) {
-        try {
-          counter = saveQueue.take();
-          logger.info(String.format("Cpu usage = %f\n", counter.cpuUsage));
-          logger.info(String.format("Memory usage = %02d\n", counter.memoryCommitted));
-        } catch (InterruptedException e) {
-          logger.error(Arrays.toString(e.getStackTrace()));
-        }
-        if (count++ > 20) {
-          break;
-        }
-      }
+
+  @Override
+  public void run() {
+    logger.info("Now running with UUID: " + this.metricUUID.toString());
+    try {
+      QuickPulseDataCollector.FinalCounters counter = saveQueue.take();
+      this.metricLine = parseMetric(counter);
+      this.saveLine();
+    } catch (InterruptedException e) {
+      String msg = "Thread interrupted (QuickPulseDataSaver).";
+      logger.error(msg, e);
+    } catch (IOException e) {
+      String msg = String.format("Unable to write metricLine '%s'", this.metricLine);
+      logger.error(msg, e);
+    } finally {
+      this.closeConnection();
     }
+  }
 
-    public void saveMetric() {
-      try {
-        CloudStorageAccount storageAccount = CloudStorageAccount.parse(storageConnectionString);
+  private static String parseMetric(QuickPulseDataCollector.FinalCounters counter) {
+    return String.format("%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,\n",
+        LocalDateTime.now(),
+        counter.exceptions,
+        counter.requests,
+        counter.requestsDuration,
+        counter.unsuccessfulRequests,
+        counter.rdds,
+        counter.rddsDuration,
+        counter.unsuccessfulRdds,
+        counter.memoryCommitted,
+        counter.cpuUsage);
+  }
 
-        // Create the Azure Files client.
-        CloudFileClient fileClient = storageAccount.createCloudFileClient();
+  private void initRemoteMetricFile() throws URISyntaxException, StorageException, IOException {
+    CloudFileShare share = fileClient.getShareReference("acimetric");
+    CloudFileDirectory rootDir = share.getRootDirectoryReference();
+    CloudFileDirectory dir = rootDir.getDirectoryReference("metrics");
+    dir.createIfNotExists();
 
-        StorageCredentials sc = fileClient.getCredentials();
+    String filename = this.metricUUID.toString() + ".csv";
+    this.cloudFile = dir.getFileReference(filename);
+    // Set filesize for now to 10mb
+    // TODO create new file when exceeded limit (if that ever happens)
+    this.outputStream = this.cloudFile.openWriteNew(Long.parseLong("10485760"));
+    this.outputStream = this.cloudFile.openWriteExisting();
+    this.metricLine = csvHeader;
+    this.saveLine();
+  }
 
-        // Get a reference to the file share
-        CloudFileShare share = fileClient.getShareReference("test");
 
-        //Get a reference to the root directory for the share.
-        CloudFileDirectory rootDir = share.getRootDirectoryReference();
+  private void saveLine() throws IOException {
+    this.outputStream.write(this.metricLine.getBytes(StandardCharsets.UTF_8));
+    this.outputStream.flush();
+  }
 
-        //Get a reference to the file you want to download
-        CloudFile file = rootDir.getFileReference("test.csv");
-
-        file.upload( new StringBufferInputStream("aaa"),"aaa".length());
-
-        System.out.println("upload success");
-
-      } catch (Exception e) {
-        // Output the stack trace.
-        e.printStackTrace();
-      }
+  private void closeConnection() {
+    try {
+      this.outputStream.close();
+    } catch (IOException e) {
+      String msg = "Could not close file connection.";
+      logger.error(msg, e);
     }
-
+  }
 
 
 }

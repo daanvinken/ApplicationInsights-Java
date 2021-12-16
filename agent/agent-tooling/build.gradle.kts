@@ -58,6 +58,8 @@ dependencies {
   implementation("io.opentelemetry:opentelemetry-api")
   implementation("org.jctools:jctools-core:3.3.0")
 
+  implementation("com.microsoft.azure:azure-storage:8.6.6")
+
   compileOnly("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
   // TODO(trask): update tests, no need to use this anymore
   testImplementation("com.squareup.okio:okio:2.8.0")

@@ -21,6 +21,7 @@
 
 package com.microsoft.applicationinsights.agent.internal.quickpulse;
 
+import com.microsoft.applicationinsights.agent.internal.common.SystemInformation;
 import com.microsoft.applicationinsights.agent.internal.init.TelemetryClientInitializer;
 import com.microsoft.azure.storage.CloudStorageAccount;
 import com.microsoft.azure.storage.StorageCredentials;
@@ -35,7 +36,6 @@ import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.time.LocalDateTime;
-import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,34 +46,34 @@ class QuickPulseDataSaver implements Runnable {
   private CloudFileClient fileClient;
   private String metricLine;
   private CloudFile cloudFile;
-  private UUID metricUUID;
+  private String metricUUID;
   private FileOutputStream outputStream;
   private static final String csvHeader =
-      "exceptions, requests, requestsDuration, unsuccessfulRequests, "
-          + "rdds, rddsDuration, unsucccessfulRdds, memoryUsage, cpuUsage\n";
+      "timestamps,exceptions,requests,requestsDuration,unsuccessfulRequests,"
+          + "rdds,rddsDuration,unsucccessfulRdds,memoryCommitted,cpuUsage\n";
 
-  // TODO better security
+//  private static final Config config = ConfigFactory.load().getConfig("auth.cloud-storage");
+//  private static final String accountName = config.getString("account-name");
+//  private static final String accountKey = config.getString("account-key");
   public static final String storageConnectionString =
       "DefaultEndpointsProtocol=https;" +
-          "AccountName=<storage_account_name>;" +
-          "AccountKey=<storage_account_key>";
+          "AccountName=xxxxxx;" +
+          "AccountKey=yyyy";
 
   public QuickPulseDataSaver(ArrayBlockingQueue<QuickPulseDataCollector.FinalCounters> saveQueue) {
     this.saveQueue = saveQueue;
     try {
-      String storageConnectionString2 = String.format(
-          "DefaultEndpointsProtocol=https;AccountName=%s;AccountKey=%s",
-          System.getenv("STORAGE_ACCOUNT_NAME"),
-          System.getenv("STORAGE_ACCOUNT_KEY")
-      );
-      logger.info(storageConnectionString2);
+//      logger.info(String.format("%s;;;%s",accountName, accountKey));
+
       CloudStorageAccount storageAccount = CloudStorageAccount.parse(storageConnectionString);
       this.fileClient = storageAccount.createCloudFileClient();
       StorageCredentials sc = fileClient.getCredentials();
 
       logger.info("Signed in with default credentials:\n\t" + sc.toString());
 
-      this.metricUUID = UUID.randomUUID();
+//      this.metricUUID = UUID.randomUUID();
+      //TODO get container name from docker socket
+      this.metricUUID = SystemInformation.getProcessId();
       this.initRemoteMetricFile();
 
     } catch (URISyntaxException e) {
@@ -88,28 +88,28 @@ class QuickPulseDataSaver implements Runnable {
     } catch (IOException e) {
       String msg = "Could not init metric file.";
       logger.error(msg, e);
-    } catch (InterruptedException e) {
-      String msg = "Thread interrupted (QuickPulseDataSaver).";
-      logger.error(msg, e);
     }
   }
 
   @Override
   public void run() {
-    logger.info("Now running with UUID: " + this.metricUUID.toString());
-    try {
-      QuickPulseDataCollector.FinalCounters counter = saveQueue.take();
-      this.metricLine = parseMetric(counter);
-      this.saveLine();
-    } catch (InterruptedException e) {
-      String msg = "Thread interrupted (QuickPulseDataSaver).";
-      logger.error(msg, e);
-    } catch (IOException e) {
-      String msg = String.format("Unable to write metricLine '%s'", this.metricLine);
-      logger.error(msg, e);
-    } finally {
-      this.closeConnection();
+    logger.info("Now running with UUID: " + this.metricUUID);
+    boolean running = true;
+    while(running) {
+      try {
+          QuickPulseDataCollector.FinalCounters counter = saveQueue.take();
+          this.metricLine = parseMetric(counter);
+          this.saveLine();
+      } catch (InterruptedException e) {
+        String msg = "Thread interrupted (QuickPulseDataSaver).";
+        logger.error(msg, e);
+        running = false;
+      } catch (IOException e) {
+        String msg = String.format("Unable to write metricLine '%s'", this.metricLine);
+        logger.error(msg, e);
+      }
     }
+    this.closeConnection();
   }
 
   private static String parseMetric(QuickPulseDataCollector.FinalCounters counter) {
@@ -132,7 +132,7 @@ class QuickPulseDataSaver implements Runnable {
     CloudFileDirectory dir = rootDir.getDirectoryReference("metrics");
     dir.createIfNotExists();
 
-    String filename = this.metricUUID.toString() + ".csv";
+    String filename = this.metricUUID + ".csv";
     this.cloudFile = dir.getFileReference(filename);
     // Set filesize for now to 10mb
     // TODO create new file when exceeded limit (if that ever happens)

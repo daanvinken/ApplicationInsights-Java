@@ -59,6 +59,7 @@ dependencies {
   implementation("org.jctools:jctools-core:3.3.0")
 
   implementation("com.microsoft.azure:azure-storage:8.6.6")
+  implementation("com.typesafe:config:1.4.1")
 
   compileOnly("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
   // TODO(trask): update tests, no need to use this anymore

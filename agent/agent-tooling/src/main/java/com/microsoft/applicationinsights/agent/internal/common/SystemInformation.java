@@ -71,5 +71,5 @@ public class SystemInformation {
     return DEFAULT_PROCESS_NAME;
   }
 
-  private SystemInformation() {}
+  public SystemInformation() {}
 }

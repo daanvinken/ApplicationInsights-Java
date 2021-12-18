@@ -39,6 +39,7 @@ com.nimbusds:oauth2-oidc-sdk:9.7=runtimeClasspath
 com.squareup.moshi:moshi-adapters:1.11.0=runtimeClasspath
 com.squareup.moshi:moshi:1.11.0=runtimeClasspath
 com.squareup.okio:okio:1.17.5=runtimeClasspath
+com.typesafe:config:1.4.1=runtimeClasspath
 commons-codec:commons-codec:1.15=runtimeClasspath
 commons-io:commons-io:2.7=runtimeClasspath
 io.netty:netty-buffer:4.1.67.Final=runtimeClasspath

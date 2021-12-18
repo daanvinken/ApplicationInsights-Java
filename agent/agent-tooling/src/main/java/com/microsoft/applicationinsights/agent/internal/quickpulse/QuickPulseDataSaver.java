@@ -50,7 +50,7 @@ class QuickPulseDataSaver implements Runnable {
   private FileOutputStream outputStream;
   private static final String csvHeader =
       "exceptions, requests, requestsDuration, unsuccessfulRequests, "
-          + "rdds, rddsDuration, unsucccessfulRdds, memoryCommitted, cpuUsage\n";
+          + "rdds, rddsDuration, unsucccessfulRdds, memoryUsage, cpuUsage\n";
 
   // TODO better security
   public static final String storageConnectionString =
@@ -61,7 +61,6 @@ class QuickPulseDataSaver implements Runnable {
   public QuickPulseDataSaver(ArrayBlockingQueue<QuickPulseDataCollector.FinalCounters> saveQueue) {
     this.saveQueue = saveQueue;
     try {
-      Thread.sleep(5000);
       String storageConnectionString2 = String.format(
           "DefaultEndpointsProtocol=https;AccountName=%s;AccountKey=%s",
           System.getenv("STORAGE_ACCOUNT_NAME"),

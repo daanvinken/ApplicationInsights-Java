@@ -1,5 +1,15 @@
 [![Build Status](https://github-private.visualstudio.com/microsoft/_apis/build/status/CDPX/applicationinsights-java/applicationinsights-java-Windows-Buddy-master?branchName=refs%2Fpull%2F1583%2Fmerge)](https://github-private.visualstudio.com/microsoft/_build/latest?definitionId=224&branchName=refs%2Fpull%2F1583%2Fmerge)
 
+# Application Insights for Java - Modification for saving azure metrics
+In order to enable the metrics for a Java application, one has to point the JVM to an additional Jar file which sends metrics to the dashboard. 
+It does this by default without any modifications. 
+One can then see the metrics on the Azure live metrics dashboard. 
+Now as these metrics are not stored anywhere, we had to modify this open-source instrumentation Jar,
+such that it stores these fine-grained metrics. 
+We decided to go with Azure File Shares to store these metrics as CSVs. 
+
+Main magic happens [here](https://github.com/daanvinken/ApplicationInsights-Java/blob/main/agent/agent-tooling/src/main/java/com/microsoft/applicationinsights/agent/internal/quickpulse/QuickPulseDataSaver.java). Unfortunately you still have to enter your Azure File Share credentials manually in `storageConnectionString`.
+
 # Application Insights for Java
 
 See documentation at https://docs.microsoft.com/en-us/azure/azure-monitor/app/java-in-process-agent.
